@@ -1,0 +1,1 @@
+ny*(ly1*cos(q1) - pcy + lx1*sin(q1)) - q4*(nx*(ly1*cos(q1) + lx1*sin(q1)) - ny*(lx1*cos(q1) - ly1*sin(q1))) - nx*(pcx - lx1*cos(q1) + ly1*sin(q1))

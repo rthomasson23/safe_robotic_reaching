@@ -1,0 +1,174 @@
+<robot name="onshape">
+<link name="world"/>
+<link name="linkBase">
+<visual>
+<origin xyz="0.0185 -3.46325e-18 0" rpy="0 -0 -3.96508e-16" />
+<geometry>
+<mesh filename="package://baselink.stl"/>
+</geometry>
+<material name="baselink_material">
+<color rgba="0.654902 0.823529 0.576471 1.0"/>
+</material>
+</visual>
+<collision>
+<origin xyz="0.0185 -3.46325e-18 0" rpy="0 -0 -3.96508e-16" />
+<geometry>
+<mesh filename="package://baselink.stl"/>
+</geometry>
+<material name="baselink_material">
+<color rgba="0.654902 0.823529 0.576471 1.0"/>
+</material>
+</collision>
+<inertial>
+<origin xyz="0.0158818 3.27366e-19 2.2749e-19" rpy="0 0 0"/>
+<mass value="0.112283" />
+<inertia ixx="1.20034e-05" ixy="-2.89409e-22"  ixz="0" iyy="1.27333e-05" iyz="0" izz="2.12849e-05" />
+</inertial>
+</link>
+
+<link name="link0">
+<visual>
+<origin xyz="3.46945e-18 3.85186e-34 0.00625" rpy="-3.14159 -0 1.53863e-35" />
+<geometry>
+<mesh filename="package://midlink.stl"/>
+</geometry>
+<material name="midlink_material">
+<color rgba="0.141176 0.694118 0.65098 1.0"/>
+</material>
+</visual>
+<collision>
+<origin xyz="3.46945e-18 3.85186e-34 0.00625" rpy="-3.14159 -0 1.53863e-35" />
+<geometry>
+<mesh filename="package://midlink.stl"/>
+</geometry>
+<material name="midlink_material">
+<color rgba="0.141176 0.694118 0.65098 1.0"/>
+</material>
+</collision>
+<inertial>
+<origin xyz="0.0497183 2.20069e-18 0.00634236" rpy="0 0 0"/>
+<mass value="0.643789" />
+<inertia ixx="9.60358e-05" ixy="-1.48146e-38"  ixz="-1.71671e-06" iyy="0.000694903" iyz="2.18678e-36" izz="0.000724384" />
+</inertial>
+</link>
+
+<link name="link1">
+<visual>
+<origin xyz="0 -1.54074e-33 0.00625" rpy="3.14159 -0 -2.24315e-37" />
+<geometry>
+<mesh filename="package://midlink.stl"/>
+</geometry>
+<material name="midlink_material">
+<color rgba="0.141176 0.694118 0.65098 1.0"/>
+</material>
+</visual>
+<collision>
+<origin xyz="0 -1.54074e-33 0.00625" rpy="3.14159 -0 -2.24315e-37" />
+<geometry>
+<mesh filename="package://midlink.stl"/>
+</geometry>
+<material name="midlink_material">
+<color rgba="0.141176 0.694118 0.65098 1.0"/>
+</material>
+</collision>
+<inertial>
+<origin xyz="0.0497183 2.20069e-18 0.00634236" rpy="0 0 0"/>
+<mass value="0.643789" />
+<inertia ixx="9.60358e-05" ixy="1.77419e-40"  ixz="-1.71671e-06" iyy="0.000694903" iyz="-3.85082e-43" izz="0.000724384" />
+</inertial>
+</link>
+
+<link name="link2">
+<visual>
+<origin xyz="-0.1 4.23705e-33 0.00625" rpy="3.14159 -0 -2.24315e-37" />
+<geometry>
+<mesh filename="package://endlink.stl"/>
+</geometry>
+<material name="endlink_material">
+<color rgba="0.141176 0.694118 0.65098 1.0"/>
+</material>
+</visual>
+<collision>
+<origin xyz="-0.1 4.23705e-33 0.00625" rpy="3.14159 -0 -2.24315e-37" />
+<geometry>
+<mesh filename="package://endlink.stl"/>
+</geometry>
+<material name="endlink_material">
+<color rgba="0.141176 0.694118 0.65098 1.0"/>
+</material>
+</collision>
+<inertial>
+<origin xyz="0.0439482 1.74132e-18 0.00625" rpy="0 0 0"/>
+<mass value="0.58676" />
+<inertia ixx="9.10293e-05" ixy="1.28406e-40"  ixz="0" iyy="0.000481409" iyz="0" izz="0.000503074" />
+</inertial>
+</link>
+
+<link name="linkEE">
+<visual>
+<origin xyz="-6.23416e-18 -1.41172e-18 0.192436" rpy="1.5708 1.5708 0" />
+<geometry>
+<mesh filename="package://eelink.stl"/>
+</geometry>
+<material name="eelink_material">
+<color rgba="1 0 0 1.0"/>
+</material>
+</visual>
+<collision>
+<origin xyz="-6.23416e-18 -1.41172e-18 0.192436" rpy="1.5708 1.5708 0" />
+<geometry>
+<mesh filename="package://eelink.stl"/>
+</geometry>
+<material name="eelink_material">
+<color rgba="1 0 0 1.0"/>
+</material>
+</collision>
+<inertial>
+<origin xyz="-1.36747e-19 -1.70428e-18 -0.00063662" rpy="0 0 0"/>
+<mass value="0.000682118" />
+<inertia ixx="4.90931e-10" ixy="7.06591e-44"  ixz="0" iyy="3.59107e-08" iyz="0" izz="3.56342e-08" />
+</inertial>
+</link>
+
+<joint name="jointEE" type="floating">
+<origin xyz="0.0924356 -6.14381e-18 0.00625" rpy="1.5708 9.09944e-18 -1.5708" />
+<parent link="link2" />
+<child link="linkEE" />
+<axis xyz="0 0 1"/>
+<limit effort="1" velocity="20" />
+<joint_properties friction="0.0"/>
+</joint>
+
+<joint name="joint2" type="revolute">
+<origin xyz="0.1 -9.79913e-31 0" rpy="6.85631e-32 -5.1639e-33 -9.86076e-30" />
+<parent link="link1" />
+<child link="link2" />
+<axis xyz="0 0 1"/>
+<limit effort="1" velocity="20" />
+<joint_properties friction="0.0"/>
+</joint>
+
+<joint name="joint1" type="revolute">
+<origin xyz="0.1 -5.65699e-19 1.73472e-17" rpy="1.42856e-18 -1.88921e-18 -3.46945e-18" />
+<parent link="link0" />
+<child link="link1" />
+<axis xyz="0 0 1"/>
+<limit effort="1" velocity="20" lower="-1.5708" upper="1.5708"/>
+<joint_properties friction="0.0"/>
+</joint>
+
+<joint name="joint0" type="revolute">
+<origin xyz="0.0185 -3.03818e-18 0.00625" rpy="3.14159 -1.8565e-18 -3.08781e-16" />
+<parent link="linkBase" />
+<child link="link0" />
+<axis xyz="0 0 1"/>
+<limit effort="1" velocity="20" lower="-1.5708" upper="1.5708"/>
+<joint_properties friction="0.0"/>
+</joint>
+
+<joint name="world2base" type="fixed">
+<parent link="world" />
+<child link="linkBase" />
+</joint>
+
+</robot>
