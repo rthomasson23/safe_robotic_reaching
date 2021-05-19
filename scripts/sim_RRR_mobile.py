@@ -6,16 +6,16 @@ import math
 import pybullet_data
 import os
 import time
-from nominalController import NominalController
-from safeController import SafeController
+from nominalControllerMobile import NominalController
+from safeControllerMobile import SafeController
 
 from utils.utils import sleeper
 
 class RRRManipulator:
 
   def __init__(self, urdfRootPath=pybullet_data.getDataPath(),
-                initBasePos=[0., 0., 0.],
-                initPos=[0.3, .0, .0],
+                initBasePos=[0., 0., 0., 0., 0.],
+                initPos=[0.3, .0, .0, 0., 0.],
                 initOrn=p.getQuaternionFromEuler([0., 0., 0.]),
                 timeStep=0.001):
     self.urdfRootPath = urdfRootPath
@@ -26,7 +26,7 @@ class RRRManipulator:
     self.initOrn = initOrn
 
     # Load URDF model
-    self.robotUid = p.loadURDF("../RRR_manipulator_description/RRR.urdf")
+    self.robotUid = p.loadURDF("../RRR_manipulator_description/RRR_mobile.urdf")
 
     # load some obstacles
     self.obs_ID = p.loadURDF("../obstacle_description/obstacle.urdf", -0.23, 0.02, 0.02)
@@ -52,21 +52,25 @@ class RRRManipulator:
 
     self.numArmJoints = 0
     # identify gripper joint and ee link
-    self.ID_0 = -1
-    self.ID_1 = -1
-    self.ID_2 = -1
+    self.ID_R0 = -1
+    self.ID_R1 = -1
+    self.ID_R2 = -1
     self.ID_EE = -1
     for i in range(p.getNumJoints(self.robotUid)):
       jointType = p.getJointInfo(self.robotUid, i)[2]
       # get the gripper joint
       if (jointType == p.JOINT_FIXED):
         self.ID_EE = i
+      if ("px2py" in str(p.getJointInfo(self.robotUid, i)[1])):
+        self.ID_P0 = i
+      if ("py2base" in str(p.getJointInfo(self.robotUid, i)[1])):
+        self.ID_P1 = i
       if ("joint0" in str(p.getJointInfo(self.robotUid, i)[1])):
-        self.ID_0 = i
+        self.ID_R0 = i
       if ("joint1" in str(p.getJointInfo(self.robotUid, i)[1])):
-        self.ID_1 = i
+        self.ID_R1 = i
       if ("joint2" in str(p.getJointInfo(self.robotUid, i)[1])):
-        self.ID_2 = i
+        self.ID_R2 = i
 
       # set link to be frictionless
       p.changeDynamics(self.robotUid, i, lateralFriction=0.0)  # makes the simulation more stable
@@ -90,11 +94,11 @@ class RRRManipulator:
   def setupControls(self):
     """ Sets up tentacleBot controller """
     # create nominal controller instance
-    jointIDs = [self.ID_0, self.ID_1, self.ID_2]
+    jointIDs = [self.ID_P0, self.ID_P1, self.ID_R0, self.ID_R1, self.ID_R2]
     self.armNomControl = NominalController(p, self.robotUid, jointIDs, self.ID_EE)
 
     # create safe controller instance
-    self.armSafeControl = SafeController(p, self.robotUid, jointIDs, self.ID_0, self.ID_1, self.ID_2)
+    self.armSafeControl = SafeController(p, self.robotUid, jointIDs)
 
     # set default controller parameters
     self.xdes = np.array([-0.25, -0.15, 0])
@@ -138,9 +142,9 @@ class RRRManipulator:
     return np.array(eePos)
 
   def visContact(self):
-    contacts_link0 = p.getContactPoints(bodyA=self.robotUid, linkIndexA=self.ID_0)
-    contacts_link1 = p.getContactPoints(bodyA=self.robotUid, linkIndexA=self.ID_1)
-    contacts_link2 = p.getContactPoints(bodyA=self.robotUid, linkIndexA=self.ID_2)
+    contacts_link0 = p.getContactPoints(bodyA=self.robotUid, linkIndexA=self.ID_R0)
+    contacts_link1 = p.getContactPoints(bodyA=self.robotUid, linkIndexA=self.ID_R1)
+    contacts_link2 = p.getContactPoints(bodyA=self.robotUid, linkIndexA=self.ID_R2)
 
     if len(contacts_link0) > 0:
       contact = contacts_link0[0]
@@ -180,9 +184,11 @@ class RRRManipulator:
 
     # apply control from nominal PD controller
     # tau_nom = self.armNomControl.computePD_op(self.xdes, self.kp, self.kv_j, self.kv_op, self.maxTorque)
-    # p.setJointMotorControl2(self.robotUid, self.ID_0, p.TORQUE_CONTROL, force=tau_nom[0])
-    # p.setJointMotorControl2(self.robotUid, self.ID_1, p.TORQUE_CONTROL, force=tau_nom[1])
-    # p.setJointMotorControl2(self.robotUid, self.ID_2, p.TORQUE_CONTROL, force=tau_nom[2])
+    # p.setJointMotorControl2(self.robotUid, self.ID_P0, p.TORQUE_CONTROL, force=tau_nom[0])
+    # p.setJointMotorControl2(self.robotUid, self.ID_P1, p.TORQUE_CONTROL, force=tau_nom[1])
+    # p.setJointMotorControl2(self.robotUid, self.ID_R0, p.TORQUE_CONTROL, force=tau_nom[2])
+    # p.setJointMotorControl2(self.robotUid, self.ID_R1, p.TORQUE_CONTROL, force=tau_nom[3])
+    # p.setJointMotorControl2(self.robotUid, self.ID_R2, p.TORQUE_CONTROL, force=tau_nom[4])
 
     # apply control from safe controller
     tau_nom = self.armNomControl.computePD_op(self.xdes, self.kp, self.kv_j, self.kv_op, self.maxTorque)
@@ -190,21 +196,23 @@ class RRRManipulator:
     # tau_safe = self.armSafeControl.computeNCControl(tau_nom, self.obs_ID)
     if tau_safe is None:
       tau_safe = tau_nom
-    p.setJointMotorControl2(self.robotUid, self.ID_0, p.TORQUE_CONTROL, force=tau_safe[0])
-    p.setJointMotorControl2(self.robotUid, self.ID_1, p.TORQUE_CONTROL, force=tau_safe[1])
-    p.setJointMotorControl2(self.robotUid, self.ID_2, p.TORQUE_CONTROL, force=tau_safe[2])
+    p.setJointMotorControl2(self.robotUid, self.ID_P0, p.TORQUE_CONTROL, force=tau_safe[0])
+    p.setJointMotorControl2(self.robotUid, self.ID_P1, p.TORQUE_CONTROL, force=tau_safe[1])
+    p.setJointMotorControl2(self.robotUid, self.ID_R0, p.TORQUE_CONTROL, force=tau_safe[2])
+    p.setJointMotorControl2(self.robotUid, self.ID_R1, p.TORQUE_CONTROL, force=tau_safe[3])
+    p.setJointMotorControl2(self.robotUid, self.ID_R2, p.TORQUE_CONTROL, force=tau_safe[4])
 
-    jointIDs = [self.ID_0, self.ID_1, self.ID_2]
-    n = len(jointIDs)
-    q = np.zeros(n)
-    qdot = np.zeros(n)
-    for i in range(n):
-      jointState = p.getJointState(self.robotUid, jointIDs[i])
-      q[i] = jointState[0]
-      qdot[i] = jointState[1]
+    # jointIDs = [self.ID_R0, self.ID_R1, self.ID_R2]
+    # n = len(jointIDs)
+    # q = np.zeros(n)
+    # qdot = np.zeros(n)
+    # for i in range(n):
+    #   jointState = p.getJointState(self.robotUid, jointIDs[i])
+    #   q[i] = jointState[0]
+    #   qdot[i] = jointState[1]
     # print(p.calculateMassMatrix(self.robotUid, list(q)))
     # print(p.calculateInverseDynamics(self.robotUid, list(q), [1,1,1], [0, 0, 0])) # this is coriolis, centrifugal + gravity
-    # print(p.calculateJacobian(self.robotUid, self.ID_2, [0, 0, 0], list(q), list(qdot), [0,0,0])[0])
+    # print(p.calculateJacobian(self.robotUid, self.ID_R2, [0, 0, 0], list(q), list(qdot), [0,0,0])[0])
 
 
     # obstacleState = self._pb.getLinkState(obstacleID, 0)

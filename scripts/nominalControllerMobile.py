@@ -50,6 +50,7 @@ class NominalController(object):
       qError = qdes - q
       Kp = kps
       Kd = kds
+      # force = -Kp*qError - Kd*qdot
       force = Kp * qError - Kd * qdot
       force = np.clip(force, -maxForce, maxForce)
       return force

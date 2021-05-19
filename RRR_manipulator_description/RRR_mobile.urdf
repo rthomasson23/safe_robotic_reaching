@@ -1,5 +1,7 @@
 <robot name="onshape">
 <link name="world"/>
+<link name="prismatic_x"/>
+<link name="prismatic_y"/>
 <link name="linkBase">
 <visual>
 <origin xyz="0.0185 -3.46325e-18 0" rpy="0 -0 -3.96508e-16" />
@@ -166,10 +168,28 @@
 <joint_properties friction="0.0"/>
 </joint>
 
-<joint name="world2base" type="fixed">
-<origin xyz="0 -0.01750000 0" rpy="0 0 1.57079632679" />
+<joint name="world2px" type="fixed">
+<origin xyz="0 -0.01750000 0" rpy="0 0 0" />
 <parent link="world" />
+<child link="prismatic_x" />
+</joint>
+
+<joint name="px2py" type="prismatic">
+<origin xyz="0 0 0" rpy="0 0 0" />
+<axis xyz="1 0 0"/>
+<parent link="prismatic_x" />
+<child link="prismatic_y" />
+<limit effort="1" velocity="20" />
+<joint_properties friction="0.0"/>
+</joint>
+
+<joint name="py2base" type="prismatic">
+<origin xyz="0 0 0" rpy="0 0 1.57079632679" />
+<axis xyz="1 0 0"/>
+<parent link="prismatic_y" />
 <child link="linkBase" />
+<limit effort="1" velocity="20" />
+<joint_properties friction="0.0"/>
 </joint>
 
 </robot>
