@@ -54,10 +54,48 @@ def GenerateTraj(z,q0,dq0,qT,dqT):
     # plt.show()
     return Q
 
+def Intrusion(Q):
+    s = np.shape(Q)
+    numJoints = 3
+    obstacles = np.array([[0, 1]]) #Start with one obstacle
+    nj = 1
+    ni = 10 # number of circles overlayed on each link
+    L = 1
+    rj = np.array([[0.5]]) #obstacle radius
+    ri = L/(ni + 1) #radius of circles on arm
+    xLast = 0
+    yLast = 0
+    cost = 0
+    for k in range(numJoints):
+        # Make the circles on the arm
+        x = np.zeros((s[0],ni))
+        y = np.zeros((s[0],ni))
+        dij = np.zeros((s[0],ni,nj))
+        for i in range(ni):
+            x[:,i] = xLast + ri*np.cos(Q[:,k])
+            y[:,i] = yLast + ri*np.sin(Q[:,k])
+            xLast = x[:,i]
+            yLast = y[:,i]
+            for j in range(nj):
+                for t in range(s[0]):
+                    dij[t,i,j] = (ri + rj[j]) - np.linalg.norm(obstacles[j,:] - [x[t,i], y[t,i]])
+                    dij[t,i,j] = np.maximum(0,dij[t,i,j])
+        cost += np.sum(dij)
+
+    return cost
+
 def TrajError(z,q0,dq0,qT,dqT):
     Q = GenerateTraj(z,q0,dq0,qT,dqT)
-    # minimize the path length for testing this opmitiztion method: UPDATE TO ACTUAL INTRUSION ERROR LATER
-    error = np.linalg.norm(Q[:,0],1) + np.linalg.norm(Q[:,3],1) + np.linalg.norm(Q[:,6],1)
+    # # minimize the path length for testing this opmitiztion method: UPDATE TO ACTUAL INTRUSION ERROR LATER
+    # error = np.linalg.norm(Q[:,0],1) + np.linalg.norm(Q[:,3],1) + np.linalg.norm(Q[:,6],1)
+
+    # Call a helper function to calculate the actual error
+    s = np.shape(Q)
+    q = np.zeros((s[0],3))
+    q[:,0] = Q[:,0]
+    q[:,1] = Q[:,3]
+    q[:,2] = Q[:,6]
+    error = Intrusion(q)
     return error
 
 def Dynamics(z,q0,dq0,qT,dqT):
