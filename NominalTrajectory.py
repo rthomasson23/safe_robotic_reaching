@@ -10,7 +10,7 @@ q0 = np.array([np.pi/9, -2*np.pi/9, np.pi/9])
 dq0 = np.array([0, 0, 0])
 qT = np.array([np.pi/2, -np.pi/3, 2*np.pi/3])
 dqT = np.array([0, 0, 0])
-uMax = 20
+uMax = 0.2
 T_Max = 15 # Maximum time for operation [s]
 numKnots = 1
 numJoints = 3
@@ -57,28 +57,29 @@ def GenerateTraj(z,q0,dq0,qT,dqT):
 def Intrusion(Q):
     s = np.shape(Q)
     numJoints = 3
-    obstacles = np.array([[0, 1]]) #Start with one obstacle
+    obstacles = np.array([[0, 0.1]]) #Start with one obstacle
     nj = 1
-    ni = 10 # number of circles overlayed on each link
-    L = 1
+    L = [.1, .1, 0.09328183]
     rj = np.array([[0.5]]) #obstacle radius
-    ri = L/(ni + 1) #radius of circles on arm
+    w = 0.035 #link width
+    rk = w / 2 #radius of circles on arm
+    ni = [int(np.ceil(i / rk)) for i in L] # number of circles overlayed on each link
     xLast = 0
     yLast = 0
     cost = 0
     for k in range(numJoints):
         # Make the circles on the arm
-        x = np.zeros((s[0],ni))
-        y = np.zeros((s[0],ni))
-        dij = np.zeros((s[0],ni,nj))
-        for i in range(ni):
-            x[:,i] = xLast + ri*np.cos(Q[:,k])
-            y[:,i] = yLast + ri*np.sin(Q[:,k])
+        x = np.zeros((s[0],ni[k]))
+        y = np.zeros((s[0],ni[k]))
+        dij = np.zeros((s[0],ni[k],nj))
+        for i in range(ni[k]):
+            x[:,i] = xLast + rk*np.cos(Q[:,k])
+            y[:,i] = yLast + rk*np.sin(Q[:,k])
             xLast = x[:,i]
             yLast = y[:,i]
             for j in range(nj):
                 for t in range(s[0]):
-                    dij[t,i,j] = (ri + rj[j]) - np.linalg.norm(obstacles[j,:] - [x[t,i], y[t,i]])
+                    dij[t,i,j] = (rk + rj[j]) - np.linalg.norm(obstacles[j,:] - [x[t,i], y[t,i]])
                     dij[t,i,j] = np.maximum(0,dij[t,i,j])
         cost += np.sum(dij)
 
@@ -101,10 +102,10 @@ def TrajError(z,q0,dq0,qT,dqT):
 def Dynamics(z,q0,dq0,qT,dqT):
     Q = GenerateTraj(z,q0,dq0,qT,dqT)
     # Robot Constants
-    L1, L2, L3 = 1, 1, 1
-    l1, l2, l3 = 1/2, 1/2, 1/2
-    m1, m2, m3 = 1, 1, 1
-    Izz1, Izz2, Izz3 = (1/3)*m1*L1**2, (1/3)*m2*L2**2, (1/3)*m3*L3**2
+    L1, L2 = .1, .1
+    l1, l2, l3 = 0.04971834, 0.04971834, 0.04400525
+    m1, m2, m3 = 0.64378923, 0.64378923, 0.58744182
+    Izz1, Izz2, Izz3 = 0.00231578, 0.00231578, 0.00163637
     n = 3 # number of links
     s  = np.shape(Q)
     u = np.zeros((s[0]*3,1))
@@ -131,7 +132,7 @@ def Dynamics(z,q0,dq0,qT,dqT):
     return u[:,0]
 
 ineqDynamics = {'type': 'ineq', 'fun': lambda z: np.array([np.amin(uMax - np.absolute(Dynamics(z,q0,dq0,qT,dqT)))])}
-ineqSpline = {'type': 'ineq', 'fun': lambda z: z}
+ineqSpline = {'type': 'ineq', 'fun': lambda z: np.absolute(z) - 0.01}
 ineqTime = {'type': 'ineq', 'fun': lambda z: T_Max - z[-1]}
 
 res = scp.minimize(TrajError, z0, args=(q0,dq0,qT,dqT), method='SLSQP', jac=None, constraints=[ineqDynamics, ineqSpline, ineqTime])
@@ -139,7 +140,13 @@ z = res.x
 print('The optimization is a success: ',res.success)
 print('Spline parameters are: ',z)
 
-uOpt = Dynamics(z,q0,dq0,qT,dqT)
+u = Dynamics(z,q0,dq0,qT,dqT)
+# Convert uOpt from 3*T x 1 to T x 3 matrix
+T = int(np.size(u)/3)
+uOpt = np.zeros((T,3))
+for t in range(T):
+    uOpt[t,:] = np.transpose(u[3*t:3*t + 3])
+np.save('uOpt',uOpt)
 Q = GenerateTraj(z,q0,dq0,qT,dqT)
 plt.plot(Q[:,0])
 plt.plot(Q[:,3])

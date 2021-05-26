@@ -1,0 +1,43 @@
+Project OH Notes 5/19
+
+Optimization problem
+	take a min with zero to avoid reward with moving far away from obstacles
+
+Criteria to decide whether to resolve SQP
+	obstacle immovable
+		resolve SQP with updated cost
+	obstacle movable
+		don't need to resolve SQP
+
+
+Regularize eqn 2
+	norm of Q - Q_terminal
+		norm 2: try harder earlier
+		norm 1: all penalized equally
+
+OR
+
+Penalize contorl input
+
+
+
+Feasiblity
+	add terminal constraint to the path
+
+How do we wanna do motion planning (experimental data?)
+	pretend no obstacles
+	pretend fixed obstacles
+
+The BUG algorithm
+	motion planning
+		drives to goal
+		responds when you hit something
+
+Project yourself onto the closest place on the spline
+	Apply the control
+	Maybe use lqr tracking
+	Nathaniel: Use PID to address Terminal error? (would not use lqr in this case)
+
+Replan if the control is zero?
+
+Simulator: Box 2D
