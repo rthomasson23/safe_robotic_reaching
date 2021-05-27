@@ -10,12 +10,13 @@ q0 = np.array([np.pi/9, -2*np.pi/9, np.pi/9])
 dq0 = np.array([0, 0, 0])
 qT = np.array([np.pi/2, -np.pi/3, 2*np.pi/3])
 dqT = np.array([0, 0, 0])
-uMax = 0.2
-T_Max = 15 # Maximum time for operation [s]
+uMax = 0.5
+T_Max = 5 # Maximum time for operation [s]
 numKnots = 1
 numJoints = 3
 z0 = np.ones((numKnots*numJoints + 1,1))
 z0 = z0[:,0]
+# z0[-1] = 2
 
 def GenerateTraj(z,q0,dq0,qT,dqT):
     T = z[-1]
@@ -103,39 +104,43 @@ def Dynamics(z,q0,dq0,qT,dqT):
     Q = GenerateTraj(z,q0,dq0,qT,dqT)
     # Robot Constants
     L1, L2 = .1, .1
-    l1, l2, l3 = 0.04971834, 0.04971834, 0.04400525
-    m1, m2, m3 = 0.64378923, 0.64378923, 0.58744182
-    Izz1, Izz2, Izz3 = 0.00231578, 0.00231578, 0.00163637
+    l1, l2, l3 = 0.0497183, 0.0497183, 0.0439482
+    m1, m2, m3 = 0.643789, 0.643789, 0.58676
+    Izz1, Izz2, Izz3 = 0.000724384, 0.000724384, 0.000503074
     n = 3 # number of links
     s  = np.shape(Q)
     u = np.zeros((s[0]*3,1))
     # Run the dynamics to check the torque constraints
     for t in range(s[0]):
-        q = Q[t,0:n]
+        q = np.zeros((n))
+        dq = np.zeros((n))
+        ddq = np.zeros((n))
+        for i in range(n):
+            q[i] = Q[t,i*n]
+            dq[i] = Q[t,i*n + 1]
+            ddq[i] = Q[t,i*n + 2]
         q2, q3 = q[1], q[2]
-        dq = Q[t,n:2*n]
         dq1, dq2, dq3 = dq[0], dq[1], dq[2]
         dqSquared = np.array([dq1**2, dq2**2, dq3**2])
         dqdq = np.array([dq1*dq2, dq1*dq3, dq2*dq3])
-        ddq = Q[t,2*n:3*n]
-        M = np.array([[Izz1 + Izz2 + Izz3 + L1**2*m2 + L1**2*m3 + L2**2*m3 + l1**2*m1 + l2**2*m2 + l3**2*m3 + 2*L1*l3*m3*np.cos(q2 + q3) + 2*L1*L2*m3*np.cos(q2) + 2*L1*l2*m2*np.cos(q2) + 2*L2*l3*m3*np.cos(q3), m3*L2**2 + 2*m3*np.cos(q3)*L2*l3 + L1*m3*np.cos(q2)*L2 + m2*l2**2 + L1*m2*np.cos(q2)*l2 + m3*l3**2 + L1*m3*np.cos(q2 + q3)*l3 + Izz2 + Izz3, Izz3 + l3**2*m3 + L1*l3*m3*np.cos(q2 + q3) + L2*l3*m3*np.cos(q3)],
+        M = np.matrix([[Izz1 + Izz2 + Izz3 + L1**2*m2 + L1**2*m3 + L2**2*m3 + l1**2*m1 + l2**2*m2 + l3**2*m3 + 2*L1*l3*m3*np.cos(q2 + q3) + 2*L1*L2*m3*np.cos(q2) + 2*L1*l2*m2*np.cos(q2) + 2*L2*l3*m3*np.cos(q3), m3*L2**2 + 2*m3*np.cos(q3)*L2*l3 + L1*m3*np.cos(q2)*L2 + m2*l2**2 + L1*m2*np.cos(q2)*l2 + m3*l3**2 + L1*m3*np.cos(q2 + q3)*l3 + Izz2 + Izz3, Izz3 + l3**2*m3 + L1*l3*m3*np.cos(q2 + q3) + L2*l3*m3*np.cos(q3)],
             [m3*L2**2 + 2*m3*np.cos(q3)*L2*l3 + L1*m3*np.cos(q2)*L2 + m2*l2**2 + L1*m2*np.cos(q2)*l2 + m3*l3**2 + L1*m3*np.cos(q2 + q3)*l3 + Izz2 + Izz3, m3*L2**2 + 2*m3*np.cos(q3)*L2*l3 + m2*l2**2 + m3*l3**2 + Izz2 + Izz3, m3*l3**2 + L2*m3*np.cos(q3)*l3 + Izz3],
             [Izz3 + l3**2*m3 + L1*l3*m3*np.cos(q2 + q3) + L2*l3*m3*np.cos(q3), m3*l3**2 + L2*m3*np.cos(q3)*l3 + Izz3, m3*l3**2 + Izz3]])
-        C = np.array([[0, -L1*(l2*m2*np.sin(q2) + l3*m3*np.sin(q2 + q3) + L2*m3*np.sin(q2)), -l3*m3*(L1*np.sin(q2 + q3) + L2*np.sin(q3))],
+        C = np.matrix([[0, -L1*(l2*m2*np.sin(q2) + l3*m3*np.sin(q2 + q3) + L2*m3*np.sin(q2)), -l3*m3*(L1*np.sin(q2 + q3) + L2*np.sin(q3))],
             [-L1*(l2*m2*np.sin(q2) + l3*m3*np.sin(q2 + q3) + L2*m3*np.sin(q2)), 0, -L2*l3*m3*np.sin(q3)],
             [-l3*m3*(L1*np.sin(q2 + q3) + L2*np.sin(q3)), -L2*l3*m3*np.sin(q3), 0]])
-        B = np.array([[-2*L1*(l2*m2*np.sin(q2) + l3*m3*np.sin(q2 + q3) + L2*m3*np.sin(q2)), -2*l3*m3*(L1*np.sin(q2 + q3) + L2*np.sin(q3)), -2*l3*m3*(L1*np.sin(q2 + q3) + L2*np.sin(q3))],
+        B = np.matrix([[-2*L1*(l2*m2*np.sin(q2) + l3*m3*np.sin(q2 + q3) + L2*m3*np.sin(q2)), -2*l3*m3*(L1*np.sin(q2 + q3) + L2*np.sin(q3)), -2*l3*m3*(L1*np.sin(q2 + q3) + L2*np.sin(q3))],
             [-2*L1*(l2*m2*np.sin(q2) + l3*m3*np.sin(q2 + q3) + L2*m3*np.sin(q2)), -2*l3*m3*(L1*np.sin(q2 + q3) + L2*np.sin(q3)), -2*L2*l3*m3*np.sin(q3)],
             [-2*l3*m3*(L1*np.sin(q2 + q3) + L2*np.sin(q3)), -2*l3*m3*(L1*np.sin(q2 + q3) + L2*np.sin(q3)), -2*L2*l3*m3*np.sin(q3)]])
-        v = np.dot(C,dqSquared) + np.dot(B,dqdq)
-        u[3*t:3*t + 3,0] = np.dot(M,ddq) + v
+        v = np.matmul(C,dqSquared) + np.matmul(B,dqdq)
+        u[3*t:3*t + 3,0] = np.matmul(M,ddq) + v
     return u[:,0]
 
 ineqDynamics = {'type': 'ineq', 'fun': lambda z: np.array([np.amin(uMax - np.absolute(Dynamics(z,q0,dq0,qT,dqT)))])}
 ineqSpline = {'type': 'ineq', 'fun': lambda z: np.absolute(z) - 0.01}
 ineqTime = {'type': 'ineq', 'fun': lambda z: T_Max - z[-1]}
 
-res = scp.minimize(TrajError, z0, args=(q0,dq0,qT,dqT), method='SLSQP', jac=None, constraints=[ineqDynamics, ineqSpline, ineqTime])
+res = scp.minimize(TrajError, z0, args=(q0,dq0,qT,dqT), method='SLSQP', jac=None, constraints=[ineqDynamics, ineqSpline, ineqTime])#, options = {'maxiter':1})
 z = res.x
 print('The optimization is a success: ',res.success)
 print('Spline parameters are: ',z)
@@ -147,6 +152,7 @@ uOpt = np.zeros((T,3))
 for t in range(T):
     uOpt[t,:] = np.transpose(u[3*t:3*t + 3])
 np.save('uOpt',uOpt)
+np.save('zOpt',z)
 Q = GenerateTraj(z,q0,dq0,qT,dqT)
 plt.plot(Q[:,0])
 plt.plot(Q[:,3])
