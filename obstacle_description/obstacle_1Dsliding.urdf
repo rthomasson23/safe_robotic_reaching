@@ -1,0 +1,73 @@
+<robot name="onshape">
+<link name="world" />
+<link name="obstacle">
+<visual>
+<origin xyz="0.00612344 0.00508274 -0.00717895" rpy="0 -0 0" />
+<geometry>
+<mesh filename="package://obstacle.stl"/>
+</geometry>
+<material name="obstacle_material">
+<color rgba="1 0.756863 0.054902 1.0"/>
+</material>
+</visual>
+<collision>
+<origin xyz="0.00612344 0.00508274 -0.00717895" rpy="0 -0 0" />
+<geometry>
+<mesh filename="package://obstacle.stl"/>
+</geometry>
+<material name="obstacle_material">
+<color rgba="1 0.756863 0.054902 1.0"/>
+</material>
+</collision>
+<inertial>
+<origin xyz="0.00612344 0.00508274 -0.00217945" rpy="0 0 0"/>
+<mass value=".00001" />
+<inertia ixx="4.80234e-07" ixy="0"  ixz="0" iyy="4.80234e-07" iyz="0" izz="8.36567e-07" />
+</inertial>
+</link>
+
+<link name="obstacleCenter">
+<visual>
+<origin xyz="0 0 -0.01" rpy="0 -0 0" />
+<geometry>
+<mesh filename="package://obstaclecenter.stl"/>
+</geometry>
+<material name="obstaclecenter_material">
+<color rgba="0.647059 0.647059 0.647059 1.0"/>
+</material>
+</visual>
+<collision>
+<origin xyz="0 0 -0.01" rpy="0 -0 0" />
+<geometry>
+<mesh filename="package://obstaclecenter.stl"/>
+</geometry>
+<material name="obstaclecenter_material">
+<color rgba="0.647059 0.647059 0.647059 1.0"/>
+</material>
+</collision>
+<inertial>
+<origin xyz="2.3167e-20 3.06162e-20 -0.0005" rpy="0 0 0"/>
+<mass value="8.26239e-07" />
+<inertia ixx="1.20493e-13" ixy="0"  ixz="0" iyy="1.20493e-13" iyz="0" izz="1.0328e-13" />
+</inertial>
+</link>
+
+<joint name="centerJoint" type="floating">
+<origin xyz="0.00612344 0.00508274 0.00282105" rpy="0 -0 0" />
+<parent link="obstacle" />
+<child link="obstacleCenter" />
+<axis xyz="0 0 1"/>
+<limit effort="1" velocity="20" />
+<joint_properties friction="0.0"/>
+</joint>
+
+<joint name="world2obstacle" type="prismatic">
+<origin xyz="0. 0. 0." rpy="0 -0 0" />
+<parent link="world" />
+<child link="obstacle" />
+<axis xyz="1 0 0"/>
+<limit effort="1" velocity="20" />
+<joint_properties friction="0.0"/>
+</joint>
+
+</robot>
