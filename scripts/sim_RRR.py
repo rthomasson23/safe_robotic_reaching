@@ -4,10 +4,12 @@ import scipy.signal
 import copy
 import math
 import pybullet_data
+import pandas as pd
 import os
 import time
 from nominalController import NominalController
 from safeController import SafeController
+import matplotlib.pyplot as plt
 
 from utils.utils import sleeper
 
@@ -18,19 +20,30 @@ class RRRManipulator:
                 initPos=[0.3, .0, .0],
                 initOrn=p.getQuaternionFromEuler([0., 0., 0.]),
                 timeStep=0.001):
+
     self.urdfRootPath = urdfRootPath
     self.timeStep = timeStep
     self.sleeper = sleeper(p, self.timeStep)
     self.initBasePos = np.array(initBasePos)
     self.initPos = self.initBasePos + np.array(initPos)
     self.initOrn = initOrn
+    self.prevTime = time.time()
+
+    #
+    self.tau_nom = np.zeros(3)
+    self.tau_safe = np.zeros(3)
+    self.tau_change = []
+    self.t = [0]
+    self.xee = np.zeros(3)
+    self.sum_force = [0]
+    self.vel_contact = np.zeros(3)
 
     # Load URDF model
     self.robotUid = p.loadURDF("../RRR_manipulator_description/RRR.urdf")
 
     # load some obstacles
-    self.obs_ID = p.loadURDF("../obstacle_description/obstacle.urdf", -0.23, 0.02, 0.02)
-    # self.obs_ID = p.loadURDF("../obstacle_description/obstacle.urdf", -1.1, 0.1, 0.02)
+    self.obs_ID = p.loadURDF("../obstacle_description/obstacle_fixed.urdf", -0.24, 0.02, 0.02) # good for fixed case
+    # self.obs_ID = p.loadURDF("../obstacle_description/obstacle_1Dsliding.urdf", -200, 0.02, 0.02)  #
     p.changeDynamics(self.obs_ID, -1, restitution=0.1)  # makes the simulation more stable
 
     # set the position of the base to be on the table
@@ -46,6 +59,7 @@ class RRRManipulator:
 
     # reset home position for arm
     self.resetPose()
+
 
   def getJointsInfo(self):
     """ Finds the number of joints and the index of specific joints for controls """
@@ -74,17 +88,19 @@ class RRRManipulator:
       if (jointType != p.JOINT_FIXED):
         self.numArmJoints += 1
 
-
-
   def resetPose(self):
     """ Sets home joint position """
-    jointPoses = p.calculateInverseKinematics(self.robotUid,
-                                              self.ID_EE,
-                                              self.initPos,
-                                              maxNumIterations=100,
-                                              residualThreshold=.01)
-    self.setArmJointDes(jointPoses[:self.numArmJoints])
-    self.sleeper.sleepSim(1, self.step)
+    p.resetJointState(self.robotUid, self.ID_0, np.pi / 9)
+    p.resetJointState(self.robotUid, self.ID_1, -np.pi / 9)
+    p.resetJointState(self.robotUid, self.ID_2, np.pi / 9)
+
+    # p.resetJointState(self.robotUid, self.ID_0, 0)
+    # p.resetJointState(self.robotUid, self.ID_1, 0)
+    # p.resetJointState(self.robotUid, self.ID_2, 0)
+    #
+    # p.resetJointState(self.robotUid, self.ID_0, 0.99 * np.pi / 2)
+    # p.resetJointState(self.robotUid, self.ID_1, -0.99 * np.pi)
+    # p.resetJointState(self.robotUid, self.ID_2, 0.99 * np.pi)
 
 
   def setupControls(self):
@@ -98,6 +114,7 @@ class RRRManipulator:
 
     # set default controller parameters
     self.xdes = np.array([-0.25, -0.15, 0])
+    # self.xdes = np.array([-0.25, -0.05, 0])
     # self.xdes = np.array([0, 1, 0])
     p.addUserDebugLine(list(self.xdes), [self.xdes[0], self.xdes[1], 1]) # show goal location
     self.maxTorque = 100.0
@@ -156,6 +173,7 @@ class RRRManipulator:
       n = -1 * np.asarray(contact[7])
       mag = contact[9]
       scaling_factor = 5
+      self.sum_force.append(self.sum_force[-1] + mag)
       p.addUserDebugLine(list(pcontact), list(pcontact + mag * scaling_factor * n), lifeTime=0.5,
                          lineColorRGB=[0, 1, 0],
                          lineWidth=5)
@@ -172,27 +190,38 @@ class RRRManipulator:
 
   def step(self):
     t = time.time()
-    #print(t-self.prevTime)
+    # print(t-self.prevTime)
     self.prevTime = t
 
     # visualize contact points
-    self.visContact()
+    # self.visContact()
 
-    # apply control from nominal PD controller
+    # # # apply control from nominal PD controller
+    # tau_nom = self.armNomControl.computePD_joints(np.array([np.pi/2, 0, 0]), .1, 0.1, self.maxTorque)
     # tau_nom = self.armNomControl.computePD_op(self.xdes, self.kp, self.kv_j, self.kv_op, self.maxTorque)
+    # self.tau_nom = np.vstack([self.tau_nom, tau_nom])
     # p.setJointMotorControl2(self.robotUid, self.ID_0, p.TORQUE_CONTROL, force=tau_nom[0])
     # p.setJointMotorControl2(self.robotUid, self.ID_1, p.TORQUE_CONTROL, force=tau_nom[1])
     # p.setJointMotorControl2(self.robotUid, self.ID_2, p.TORQUE_CONTROL, force=tau_nom[2])
 
+
     # apply control from safe controller
     tau_nom = self.armNomControl.computePD_op(self.xdes, self.kp, self.kv_j, self.kv_op, self.maxTorque)
+    self.tau_nom = np.vstack([self.tau_nom, tau_nom])
     tau_safe = self.armSafeControl.computeSafeControl(self.maxTorque, tau_nom)
+    self.tau_safe = np.vstack([self.tau_safe, tau_safe])
+    self.tau_change.append(np.linalg.norm(tau_safe - tau_nom))
+    self.t.append(t)
     # tau_safe = self.armSafeControl.computeNCControl(tau_nom, self.obs_ID)
     if tau_safe is None:
       tau_safe = tau_nom
     p.setJointMotorControl2(self.robotUid, self.ID_0, p.TORQUE_CONTROL, force=tau_safe[0])
     p.setJointMotorControl2(self.robotUid, self.ID_1, p.TORQUE_CONTROL, force=tau_safe[1])
     p.setJointMotorControl2(self.robotUid, self.ID_2, p.TORQUE_CONTROL, force=tau_safe[2])
+
+    ee_state = p.getLinkState(self.robotUid, self.ID_EE, computeLinkVelocity=False)
+    xee = np.asarray(ee_state[0])
+    self.xee = np.vstack([self.xee, xee])
 
     jointIDs = [self.ID_0, self.ID_1, self.ID_2]
     n = len(jointIDs)
@@ -228,3 +257,23 @@ if __name__ == "__main__":
       t = time.time()
     h.step()
     p.stepSimulation()
+
+  # np.save('sum_force_safe_failure', h.sum_force)
+  # plt.rcParams.update({'font.size': 22})
+  # fig, axs = plt.subplots(3)
+  # fig.suptitle('Nominal and Safe Control Inputs')
+  # axs[0].plot(h.tau_nom[:, 0], 'r--', label='nominal')
+  # axs[0].plot(h.tau_safe[:, 0], 'c', label='safe')
+  # axs[0].set( ylabel='tau proximal')
+  # axs[0].legend(loc='upper right')
+  #
+  # axs[1].plot(h.tau_nom[:, 1], 'r--', label='nominal')
+  # axs[1].plot(h.tau_safe[:, 1], 'c', label='safe')
+  # axs[1].set( ylabel='tau medial')
+  #
+  # axs[2].plot(h.tau_nom[:, 2], 'r--', label='nominal')
+  # axs[2].plot(h.tau_safe[:, 2], 'c', label='safe')
+  # axs[2].set(xlabel='simulation count', ylabel='tau distal')
+  # plt.show()
+
+

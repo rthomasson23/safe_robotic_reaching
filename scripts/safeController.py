@@ -100,7 +100,6 @@ class SafeController(object):
             tau_safe = tau.value
         else:
             tau_safe = tau_nom
-        print(np.linalg.norm(tau_safe - tau_nom))
         return tau_safe
 
     def computeSafeControl(self, maxForce, tau_nom):
@@ -220,7 +219,6 @@ class SafeController(object):
         lx = np.dot(xlink, (pcontact - Pworld2link))
         ly = np.dot(ylink, (pcontact - Pworld2link))
         plink = [lx, ly, 0]
-        print(plink)
         # plink[1] -= l[link_ID - 1]
         # self._pb.addUserDebugLine(list(Rworld2link[:,1]), [0,0,0], lifeTime=0.5, lineColorRGB=[0.5, 0.5, 0])
         # self._pb.addUserDebugLine(list(pcontact), list(pcontact + [0,0,1]), lifeTime=0.5, lineColorRGB=[0.5, 0.5, 0])
