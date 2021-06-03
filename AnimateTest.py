@@ -73,7 +73,7 @@ ax.grid()
 
 line, = ax.plot([], [], 'o-', lw=2)
 time_template = 'time = %.1fs'
-time_text = ax.text(0.05, 0.9, '', transform=ax.transAxes)
+time_text = ax.text(0.35, 0.05, '', transform=ax.transAxes, fontsize='xx-large', fontweight='bold')
 
 
 def init():
@@ -83,18 +83,8 @@ def init():
 
 
 def animate(i):
-    theta = np.linspace( 0 , 2 * np.pi , 150 )
-    radius = 0.5
-    a = radius * np.cos( theta )
-    b = radius * np.sin( theta )
-    plt.clf()
-    ax = fig.add_subplot(111, autoscale_on=False, xlim=(-2, 2), ylim=(-2, 2))
-    ax.grid()
-    
-    plt.plot(a,b,'r')
     thisx = [0, x1[i], x2[i]]
     thisy = [0, y1[i], y2[i]]
-    plt.plot(thisx,thisy)
 
     line.set_data(thisx, thisy)
     time_text.set_text(time_template % (i*dt))
