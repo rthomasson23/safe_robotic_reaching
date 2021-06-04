@@ -10,7 +10,7 @@ class NominalController(object):
     self.ID_EE = ID_EE
 
 
-  def computePD_op(self, xdes, kp, kv_j, kv_op, maxForce):
+  def computePD_op(self, xdes, kp, kv_j, kv_op, maxTorque):
       n = len(self.jointIDs)
       q = np.zeros(n)
       qdot = np.zeros(n)
@@ -32,26 +32,8 @@ class NominalController(object):
 
       xError = xdes - x
       xError[2] = 0 # we're neglecting any z-error since we consider it planar
-      # force = np.dot(Jv.T, (kp*xError)) - kv * qdot # joint space damping
-      # force = np.dot(Jv.T, (kp * xError - kv * xdot))  # cartesian space damping
-      force = np.dot(Jv.T, (kp * xError - kv_op * xdot)) - kv_j * qdot # cartesian space damping
-      force = np.clip(force, -maxForce, maxForce)
-      return force
 
-  def computePD_joints(self, qdes, kps, kds, maxForce):
-      n = len(self.jointIDs)
-      q = np.zeros(n)
-      qdot = np.zeros(n)
-      for i in range(n):
-          jointState = self._pb.getJointState(self.bodyID, self.jointIDs[i])
-          q[i] = jointState[0]
-          qdot[i] = jointState[1]
-
-      qError = qdes - q
-      Kp = kps
-      Kd = kds
-      force = Kp * qError - Kd * qdot
-      force = np.clip(force, -maxForce, maxForce)
-      return force
-
-
+      force = (kp * xError - kv_op * xdot)
+      tau = np.dot(Jv.T, force) - kv_j * qdot  # cartesian space damping
+      tau = np.clip(tau, -maxTorque, maxTorque)
+      return tau

@@ -1,1 +1,0 @@
-nx*q6 - q8*(nx*(ly1*cos(q3) + lx1*sin(q3)) - ny*(lx1*cos(q3) - ly1*sin(q3))) + ny*q7 - nx*(pcx - q1 - lx1*cos(q3) + ly1*sin(q3)) + ny*(q2 - pcy + ly1*cos(q3) + lx1*sin(q3))
