@@ -1,1 +1,0 @@
-(obs_x + d*sin(q1 + q2) + L1*sin(q1))^2 + (d*cos(q1 + q2) - obs_y + L1*cos(q1))^2 - r^2 + q4*(2*d*obs_x*cos(q1 + q2) + 2*d*obs_y*sin(q1 + q2) + 2*L1*obs_x*cos(q1) + 2*L1*obs_y*sin(q1)) + 2*d*q5*(obs_x*cos(q1 + q2) + obs_y*sin(q1 + q2) - L1*sin(q2))
