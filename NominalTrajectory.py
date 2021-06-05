@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import time
 import matplotlib.animation as animation
 import os
+import random
 
 # Spline constants
 q0 = np.array([0.99*np.pi/2, -0.99*np.pi, 0.99*np.pi])
@@ -17,7 +18,7 @@ q0 = np.array([0.99*np.pi/2, -0.99*np.pi, 0.99*np.pi])
 dq0 = np.array([0, 0, 0])
 qT = np.array([np.pi/2, 0, 0])
 dqT = np.array([0, 0, 0])
-uMax = 2
+uMax = 2 #10
 T_Max = 10                                       # maximum time for operation [s]
 dt = 0.001
 numKnots = 1
@@ -25,18 +26,23 @@ numKnots = 1
 # Environmental constants
 L = [.1, .1, 0.09328183]                        # link length [m]
 w = 0.035                                       # link width [m]
+rk = w / 2                                      #radius of circles on arm
 rj = np.array([[0.06],[0.06]])                  # obstacle radius [m]
 obstacles = np.array([[-0.1, 0.2],[0.1, 0.2]])  # Two obstacles
-# # Impassable obstacles
+# Impassable obstacles
 # obstacles = np.array([[-0.1, 0],[0.1, -0.1],[0.1, 0.1]])              
-# rj = np.array([[0.06],[0.06],[0.06]]) 
+rj = np.array([[0.09],[0.09]])#,[0.06]]) 
 numLinks = 3
 
+# Optimization globals
 z0 = np.ones(numKnots*numLinks + 1)
 for j in range(numKnots):
     z0[numLinks * j: numLinks * (j + 1)] = (j + 1) * (qT - q0) / (numKnots + 1) + q0
 errInGain = 10
+rho = 1
+gamma = 2
 
+# print("z0 = ",z0)
 def GenerateTraj(z):
     T = np.absolute(z[-1])
     N = int(np.floor(T/dt))
@@ -82,7 +88,6 @@ def GenerateTraj(z):
 def Intrusion(Q):
     s = np.shape(Q)
     nj = obstacles.shape[0]
-    rk = w / 2 #radius of circles on arm
     ni = [int(np.ceil(i / rk)) for i in L] # number of circles overlayed on each link
     xLast = 0
     yLast = 0
@@ -113,10 +118,22 @@ def Intrusion(Q):
     return cost
 
 def TrajError(z):
-    Q = GenerateTraj(z)
+    # Nelder-Mead constraint costs
     T = np.absolute(z[-1])
-    if T < dt:
-        return 1000
+    ni = [int(np.ceil(i / rk)) for i in L] # number of circles overlayed on each link
+    errorMax = errInGain * np.sum(ni)
+    global rho
+    rhoCap = 10**10
+    c1, c2, c3 = 0, 0, 0
+    if T < dt or T > T_Max:
+        c1 = rho * errorMax
+    Q = GenerateTraj(z)
+    qAbs = np.absolute(Q[:,[0,3,6]])
+    if np.maximum(np.amax(qAbs - np.pi),0) > 0:
+        c2 = rho*errorMax
+    uAbs = np.absolute(Dynamics(z))
+    if np.maximum(np.amax(uAbs - uMax),0) > 0:
+        c3 = rho*errorMax
     # Call a helper function to calculate the actual error
     s = np.shape(Q)
     q = np.zeros((s[0],3))
@@ -125,13 +142,10 @@ def TrajError(z):
     q[:,2] = Q[:,6] + Q[:,3] + Q[:,0]
     errorIn = errInGain * Intrusion(q)
     errorT =  (T / T_Max)
+    p = np.amax([c1, c2, c3])
+    rho = np.where(p > 0, np.minimum(rho*gamma,rhoCap), rho)
     # errorU = 1 * np.amax(np.absolute(Dynamics(z)) / uMax)
-    error = errorIn + errorT #+ errorU
-    # Nelder-Mead constraint cost
-    errorCU = np.where(np.maximum(np.amax(np.absolute(Dynamics(z)) - uMax),0) > 0, 1000,0)
-    errorCQ = np.where(np.maximum(np.amax(np.absolute(GenerateTraj(z)[:,[0,3,6]]) - np.pi),0) > 0, 1000, 0)
-    errorCT = np.where(np.maximum(z[-1],T_Max) > T_Max, 1000, 0)
-    error = error + errorCU + errorCQ + errorCT
+    error = errorIn + p + errorT #+ errorU
     return error
 
 def Dynamics(z):
@@ -170,64 +184,87 @@ def Dynamics(z):
         u[n*t:n*t + n,0] = np.matmul(M,ddq) + v
     return u[:,0]
 
-ineqDynamics = {'type': 'ineq', 'fun': lambda z: np.array([np.amin(uMax - np.absolute(Dynamics(z)))])}
-ineqTraj = {'type': 'ineq', 'fun': lambda z: np.array([np.amin(np.pi - np.absolute(GenerateTraj(z)[:,[0,3,6]]))])}
-lb = -np.pi * np.ones(z0.size)
-lb[-1] = 1
-ub = np.pi * np.ones(z0.size)
-ub[-1] = T_Max
-bnds = scp.Bounds(lb,ub)
+def z0Opt(z0):
+    # Optimization constraints
+    T = np.absolute(z0[-1])
+    if T < dt or T > T_Max:
+        return 1000
+    Q = GenerateTraj(z0)
+    qAbs = np.absolute(Q[:,[0,3,6]])
+    if np.amax(qAbs) > np.pi:
+        return 1000
+    uAbs = np.absolute(Dynamics(z0))
+    errorCU = np.where(np.maximum(np.amax(uAbs - uMax),0) > 0, 1000**np.maximum(np.amax(uAbs),1),0)
+    if errorCU > 1000:
+        return errorCU
 
-print("N = ", numKnots)
-startT = time.time()
-res = scp.minimize(TrajError, z0, method='Nelder-Mead', jac=None, #bounds = bnds,
-    # constraints=[ineqTraj,ineqDynamics], options = {'disp':True})#,'ftol':10**-9})
-    options = {'disp':True})
-endT = time.time()
-z = res.x
-print('Spline parameters are: ',z)
-print('Time of optimization: ',endT - startT)
+    res = scp.minimize(TrajError, z0, method='Nelder-Mead', jac=None,options = {'disp':True})
+    error = res.fun
+    return error
 
-# Convert uOpt from 3*T x 1 to T x 3 matrix
-u = Dynamics(z)
-print('Maximum torque is', np.amax(np.absolute(u)))
-T = int(np.size(u)/numLinks)
-T_end = z[-1]
-uOpt = np.zeros((T,numLinks))
-for t in range(T):
-    uOpt[t,:] = np.transpose(u[numLinks*t:numLinks*t + numLinks])
-np.save('uOpt',uOpt)
-np.save('zOpt',z)
 
-# Plot the joint angles
-Q = GenerateTraj(z)
-np.save('Q_Opt',Q)
-# cwd = os.getcwd()
-# Q = np.load(cwd + '/Q_Opt.npy')
-q1 = Q[:,0]
-q2 = Q[:,3]
-q3 = Q[:,6]
-s  = np.shape(Q)
-q = np.zeros((s[0],3))
-q[:,0] = Q[:,0]
-q[:,1] = Q[:,3] + Q[:,0]
-q[:,2] = Q[:,6] + Q[:,3] + Q[:,0]
-errorIn = errInGain * Intrusion(q)
-print("Intrusion error is:",errorIn)
+# print("N = ", numKnots)
+# startT = time.time()
+# #Direct Methods
+# res = scp.minimize(TrajError, z0, method='Nelder-Mead', jac=None,options = {'disp':True})#,'ftol':10**-9})
+# #SLSQP
+# # ineqDynamics = {'type': 'ineq', 'fun': lambda z: np.array([np.amin(uMax - np.absolute(Dynamics(z)))])}
+# # ineqTraj = {'type': 'ineq', 'fun': lambda z: np.array([np.amin(np.pi - np.absolute(GenerateTraj(z)[:,[0,3,6]]))])}
+# # lb = -np.pi * np.ones(z0.size)
+# # lb[-1] = 1
+# # ub = np.pi * np.ones(z0.size)
+# # ub[-1] = T_Max
+# # bnds = scp.Bounds(lb,ub)
+# # res = scp.minimize(TrajError, z0, method='SLSQP', jac=None, bounds = bnds,
+# #     constraints=[ineqTraj,ineqDynamics], options = {'disp':True})#,'ftol':10**-9})
+# endT = time.time()
+
+# z = res.x
+# print('Spline parameters are: ',z)
+# print('Time of optimization: ',endT - startT)
+
+# # Convert uOpt from 3*T x 1 to T x 3 matrix
+# u = Dynamics(z)
+# print('Maximum torque is', np.amax(np.absolute(u)))
+# error = TrajError(z)
+# T = int(np.size(u)/numLinks)
+# T_end = z[-1]
+# uOpt = np.zeros((T,numLinks))
+# for t in range(T):
+#     uOpt[t,:] = np.transpose(u[numLinks*t:numLinks*t + numLinks])
+# np.save('uOpt',uOpt)
+# np.save('zOpt',z)
+
+# # Plot the joint angles
+# Q = GenerateTraj(z)
+# np.save('Q_Opt',Q)
+# # cwd = os.getcwd()
+# # Q = np.load(cwd + '/Q_Opt.npy')
+# q1 = Q[:,0]
+# q2 = Q[:,3]
+# q3 = Q[:,6]
+# s  = np.shape(Q)
+# q = np.zeros((s[0],3))
+# q[:,0] = Q[:,0]
+# q[:,1] = Q[:,3] + Q[:,0]
+# q[:,2] = Q[:,6] + Q[:,3] + Q[:,0]
+# errorIn = errInGain * Intrusion(q)
+# print("Intrusion error is:",errorIn)
 # plt.plot(q1)
 # plt.plot(q2)
 # plt.plot(q3)
 # plt.show()
 
-# # Animate PD controller output
-# cwd = os.getcwd()
-# qPD = np.load(cwd + '/q_PD.npy')
-# q1 = qPD[:,0]
-# q2 = qPD[:,1]
-# q3 = qPD[:,2]
-# q = np.array([q1,q2 + q1,q3 + q2 + q1])
-# errorIn = errInGain * Intrusion(q.T)
-# T_end = 9.3
+# Animate PD controller output
+cwd = os.getcwd()
+qPD = np.load(cwd + '/q_PD.npy')
+q1 = qPD[:,0]
+q2 = qPD[:,1]
+q3 = qPD[:,2]
+q = np.array([q1,q2 + q1,q3 + q2 + q1])
+errorIn = errInGain * Intrusion(q.T)
+T_end = 9.346
+dt = T_end/q1.size
 
 # Animate the solution
 
@@ -247,8 +284,8 @@ ax.grid()
 #Obstacles
 for j in range(obstacles.shape[0]):
     theta = np.linspace( 0 , 2 * np.pi , 150 )
-    a = (rj[j][0] + w/2) * np.cos( theta ) + obstacles[j,0]
-    b = (rj[j][0] + w/2) * np.sin( theta ) + obstacles[j,1]
+    a = (rj[j][0]) * np.cos( theta ) + obstacles[j,0]
+    b = (rj[j][0]) * np.sin( theta ) + obstacles[j,1]
     ax.plot(a,b)
 
 # # Plot the intermediate states, comparing spline vs PD
@@ -275,7 +312,7 @@ for j in range(obstacles.shape[0]):
 
 line, = ax.plot([], [], 'o-', lw=2)
 time_template = 'time = %.1fs'
-time_text = ax.text(0.35, 0.9, '', transform=ax.transAxes, fontsize='xx-large', fontweight='bold')
+time_text = ax.text(0.35, 0.1, '', transform=ax.transAxes, fontsize='xx-large', fontweight='bold')
 
 def init():
     line.set_data([], [])
@@ -290,8 +327,8 @@ def animate(i):
     time_text.set_text(time_template % (i*dt))
     return line, time_text
 
-ani = animation.FuncAnimation(fig, animate, np.arange(1, len(q1)),
+ani = animation.FuncAnimation(fig, animate, np.arange(1, len(y1)),
                               interval=1, blit=True, init_func=init)
-
-# ani.save('SLSQP_N8.mp4', fps=15)
+plt.show()
+ani.save('PD.mp4', fps=1000)
 plt.show()
