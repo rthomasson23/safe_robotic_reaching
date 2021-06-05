@@ -1,4 +1,9 @@
 """
+File AnimateTest.py
+    This file is used for testing changes to the animation scheme.
+    It is mostly open source code from https://matplotlib.org/3.2.2/gallery/animation/double_pendulum_sgskip.html
+"""
+"""
 ===========================
 The double pendulum problem
 ===========================
